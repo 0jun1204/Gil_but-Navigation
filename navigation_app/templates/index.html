@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>시각장애인용 보행자 내비게이션 & 실시간 탐지</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+</head>
+<body>
+  <!-- 내비게이션 화면 -->
+  <div id="navigation-view" style="display: block;">
+    <div id="app">
+      <!-- 왼쪽 사이드바 -->
+      <aside id="sidebar" class="collapsed">
+        <div class="sidebar-header">
+          <h2><i class="fas fa-route"></i> 내비게이션</h2>
+          <button id="sidebar-toggle" aria-label="사이드바 토글">
+            <i class="fas fa-bars"></i>
+          </button>
+        </div>
+        
+        <div class="sidebar-content">
+          <div class="status-card">
+            <div id="status">현재 위치를 확인 중...</div>
+          </div>
+
+          <div id="destination-form" class="form-card">
+            <h3><i class="fas fa-map-marker-alt"></i> 목적지 설정</h3>
+            <div class="form-group">
+              <div class="input-group">
+                <input type="text" id="destination" placeholder="목적지를 말하거나 입력하세요">
+                <button id="voice-input" class="voice-btn" title="음성 입력">
+                  <i class="fas fa-microphone"></i>
+                </button>
+              </div>
+              <!-- 검색 버튼은 하단 고정 바로 이동 -->
+            </div>
+            
+            <div class="radius-selector">
+              <label><i class="fas fa-expand-arrows-alt"></i> 검색 반경</label>
+              <select id="search-radius">
+                <option value="500">500m</option>
+                <option value="1000" selected>1km</option>
+                <option value="3000">3km</option>
+                <option value="5000">5km</option>
+              </select>
+            </div>
+            
+            <div id="search-results" style="display: none;"></div>
+            <!-- 길 안내 시작 버튼은 하단 고정 바로 이동 -->
+          </div>
+
+          <div id="navigation-info" class="nav-card" style="display: none;">
+            <h3><i class="fas fa-directions"></i> 안내 정보</h3>
+            <div class="nav-stats">
+              <div class="stat-item">
+                <i class="fas fa-road"></i>
+                <div>
+                  <span class="stat-label">남은 거리</span>
+                  <span id="distance" class="stat-value">0m</span>
+                </div>
+              </div>
+              <div class="stat-item">
+                <i class="fas fa-clock"></i>
+                <div>
+                  <span class="stat-label">예상 시간</span>
+                  <span id="time" class="stat-value">00:00:00</span>
+                </div>
+              </div>
+            </div>
+            
+            <div class="next-direction">
+              <i class="fas fa-arrow-right"></i>
+              <span id="next-direction">진행 중...</span>
+            </div>
+            
+            <div class="nav-controls">
+              <button id="toggle-voice" class="control-btn">
+                <i class="fas fa-volume-up"></i> 음성
+              </button>
+              <button id="read-instruction" class="control-btn">
+                <i class="fas fa-redo"></i> 다시듣기
+              </button>
+              <button id="stop-navigation" class="control-btn danger">
+                <i class="fas fa-stop"></i> 종료
+              </button>
+            </div>
+          </div>
+          <!-- 실시간 탐지 버튼도 하단 고정 바로 이동 -->
+        </div>
+      </aside>
+
+      <!-- 메인 지도 영역 -->
+      <main id="map-container">
+        <div id="map"></div>
+        
+        <!-- 플로팅 컨트롤 -->
+        <div class="floating-controls">
+          <button id="center-map" class="floating-btn" title="현재 위치로 이동">
+            <i class="fas fa-crosshairs"></i>
+          </button>
+          <button id="toggle-panel" class="floating-btn" title="패널 토글">
+            <i class="fas fa-layer-group"></i>
+          </button>
+        </div>
+
+        <!-- 빅 보이스 버튼 (중앙 하단) -->
+        <button id="big-voice-input" class="big-voice-floating">
+          <i class="fas fa-microphone"></i>
+          <span class="voice-text">음성으로 목적지 말하기</span>
+        </button>
+      </main>
+    </div>
+
+    <!-- ✅ 하단 고정 버튼 바 -->
+    <div id="bottom-bar">
+      <button id="search" class="primary-btn">
+        <i class="fas fa-search"></i> 검색
+      </button>
+
+      <button id="start-navigation" class="action-btn start">
+        <i class="fas fa-play"></i> 길 안내 시작
+      </button>
+
+      <button id="open-detection" class="detection-btn">
+        <i class="fas fa-eye"></i> 실시간 탐지 화면
+      </button>
+    </div>
+  </div>
+
+  <!-- 탐지 화면 -->
+  <div id="detection-view" style="display: none;">
+    <div class="detection-layout">
+      <header class="detection-header">
+        <h1><i class="fas fa-eye"></i> 실시간 탐지 시스템</h1>
+        <button onclick="showNavigation()" class="back-btn">
+          <i class="fas fa-arrow-left"></i> 내비게이션으로 돌아가기
+        </button>
+      </header>
+
+      <div class="detection-content">
+        <div class="video-section">
+          <div class="screen-selector-card">
+            <h3><i class="fas fa-desktop"></i> 화면 선택</h3>
+            <div class="screen-buttons">
+              <button onclick="switchScreen('original')" class="screen-btn active" data-screen="original">
+                <i class="fas fa-video"></i> 원본
+              </button>
+              <button onclick="switchScreen('depth')" class="screen-btn" data-screen="depth">
+                <i class="fas fa-layer-group"></i> 깊이
+              </button>
+              <button onclick="switchScreen('obstacle')" class="screen-btn" data-screen="obstacle">
+                <i class="fas fa-exclamation-triangle"></i> 장애물
+              </button>
+              <button onclick="switchScreen('segmentation')" class="screen-btn" data-screen="segmentation">
+                <i class="fas fa-puzzle-piece"></i> 세그멘테이션
+              </button>
+            </div>
+          </div>
+
+          <div class="video-display-card">
+            <div id="screen-container">
+              <div id="screen-original" class="screen active">
+                <video id="video-original" autoplay playsinline muted></video>
+              </div>
+              <div id="screen-depth" class="screen">
+                <img id="depthmap" alt="Depth Map Visualization">
+              </div>
+              <div id="screen-obstacle" class="screen">
+                <img id="obstaclemap" alt="Obstacle Detection">
+              </div>
+              <div id="screen-segmentation" class="screen">
+                <img id="segmentationmap" alt="Segmentation Visualization">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <div class="warnings-card">
+            <h3><i class="fas fa-bell"></i> 경고 메시지</h3>
+            <div id="warnings" class="warnings-content">현재 경고가 없습니다.</div>
+          </div>
+
+          <div class="status-card">
+            <h3><i class="fas fa-info-circle"></i> 시스템 상태</h3>
+            <div class="status-items">
+              <div class="status-item"><i class="fas fa-camera"></i><span>카메라: 활성</span></div>
+              <div class="status-item"><i class="fas fa-brain"></i><span>AI 모델: 실행중</span></div>
+              <div class="status-item"><i class="fas fa-volume-up"></i><span>음성 안내: 활성</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <video id="video" autoplay playsinline muted style="display: none;"></video>
+    </div>
+  </div>
+
+  <script>
+    const API_KEY = "{{ api_key }}";
+    let currentDetectionScreen = "original";
+    let navigationActive = false;
+    let detectionStarted = false;
+
+    document.getElementById("start-navigation").addEventListener("click", function () {
+      if (!detectionStarted) {
+        startDetection();
+        detectionStarted = true;
+      }
+      navigationActive = true;
+    });
+
+    // ✅ 하단바 탐지 버튼 연결
+    document.getElementById("open-detection").addEventListener("click", showDetection);
+
+    document.getElementById("stop-navigation").addEventListener("click", function () {
+      navigationActive = false;
+      const video = document.getElementById("video");
+      if (video.srcObject) {
+        video.srcObject.getTracks().forEach(track => track.stop());
+        video.srcObject = null;
+      }
+    });
+
+    function showDetection() {
+      document.getElementById("detection-view").style.display = "block";
+      document.getElementById("navigation-view").style.display = "none";
+    }
+    function showNavigation() {
+      document.getElementById("detection-view").style.display = "none";
+      document.getElementById("navigation-view").style.display = "block";
+    }
+    function switchScreen(screen) {
+      currentDetectionScreen = screen;
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+      document.querySelectorAll('.screen-btn').forEach(btn => btn.classList.remove('active'));
+      document.getElementById(`screen-${screen}`).classList.add('active');
+      document.querySelector(`[data-screen="${screen}"]`).classList.add('active');
+    }
+    function toggleSidebar() {
+      const sidebar = document.getElementById('sidebar');
+      sidebar.classList.toggle('collapsed');
+    }
+    document.addEventListener('DOMContentLoaded', function() {
+      const sidebarToggle = document.getElementById('sidebar-toggle');
+      if (sidebarToggle) sidebarToggle.addEventListener('click', toggleSidebar);
+    });
+
+    async function startDetection() {
+      const video = document.getElementById("video");
+      const videoOriginal = document.getElementById("video-original");
+      const warningsDiv = document.getElementById("warnings");
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 640, height: 640, facingMode: "environment" }
+        });
+        video.srcObject = stream;
+        if (videoOriginal) videoOriginal.srcObject = stream;
+      } catch (err) {
+        console.error("카메라 접근 오류:", err);
+        return;
+      }
+
+      setInterval(() => {
+        if (!navigationActive) return;
+        sendFrame(video, warningsDiv);
+      }, 200);
+
+      async function updateImage(imgElement, url) {
+        try {
+          const response = await fetch(url, { cache: "no-store" });
+          const blob = await response.blob();
+          const objectURL = URL.createObjectURL(blob);
+          imgElement.src = objectURL;
+        } catch (err) {
+          console.warn("이미지 불러오기 실패:", err);
+        }
+      }
+      setInterval(() => {
+        const now = Date.now();
+        if (currentDetectionScreen === "depth") {
+          updateImage(document.getElementById("depthmap"), `/static/depthmap_latest.jpg?t=${now}`);
+        }
+        if (currentDetectionScreen === "obstacle") {
+          updateImage(document.getElementById("obstaclemap"), `/static/obstacle_latest.jpg?t=${now}`);
+        }
+        if (currentDetectionScreen === "segmentation") {
+          updateImage(document.getElementById("segmentationmap"), `/static/segmentation_latest.jpg?t=${now}`);
+        }
+      }, 300);
+    }
+
+    async function sendFrame(video, warningsDiv) {
+      const tempCanvas = document.createElement("canvas");
+      tempCanvas.width = 640;
+      tempCanvas.height = 640;
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+
+      tempCanvas.toBlob(async blob => {
+        const formData = new FormData();
+        formData.append("file", blob, "frame.jpg");
+        try {
+          const response = await fetch(`/process_warning?screen=${currentDetectionScreen}`, {
+            method: "POST",
+            body: formData,
+            cache: "no-store"
+          });
+          const data = await response.json();
+          warningsDiv.innerHTML = data.warnings.join("<br>");
+          if (data.audio_url && typeof enqueueMp3 === 'function') {
+            enqueueMp3(data.audio_url);
+          }
+        } catch (err) {
+          console.error("프레임 전송 오류:", err);
+        }
+      }, "image/jpeg");
+    }
+  </script>
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+# 가상환경
+venv/
+env/
+ENV/
+
+# Python 캐시
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# 환경 변수 파일
+.env
+.env.local
+
+# 실행 중 생성되는 임시 파일 (README_images는 제외)
+navigation_app/static/depthmap_latest.jpg
+navigation_app/static/obstacle_latest.jpg
+navigation_app/static/segmentation_latest.jpg
+!README_images/
+
+# ONNX 모델 파일 (크기가 크므로 README에서 다운로드 링크 제공)
+onnx_models/
+*.onnx
+
+# IDE 설정
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# 테스트 파일
+123.py
+
+# 기타 문서 (실행과 무관)
+*.hwpx 

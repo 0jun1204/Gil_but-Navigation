@@ -1,0 +1,12 @@
+timm
+onnx
+matplotlib
+ultralytics
+onnxruntime-gpu
+opencv-python
+numpy
+pyproj
+transformers
+pyngrok
+python-multipart
+python-dotenv
